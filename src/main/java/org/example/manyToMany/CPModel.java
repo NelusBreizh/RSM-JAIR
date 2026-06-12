@@ -8,9 +8,8 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.SetVar;
 import org.chocosolver.util.objects.graphs.DirectedGraph;
 import org.example.propagators.PropClosedSubSet;
-import org.example.propagators.PropIndexUnion;
+import org.example.propagators.PropIndexDisjointUnion;
 import org.example.propagators.PropSetDifference;
-import org.example.propagators.PropSymDiff;
 import org.javatuples.Pair;
 
 import java.util.*;
@@ -103,13 +102,13 @@ public class CPModel {
 
 
         for (int r = 0; r < number_rotation; r++) {
-            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexUnion(sym_diff_up[r], generated_up[r], rotationGeneratedCouples, false)));
-            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexUnion(sym_diff_down[r], generated_down[r], rotationGeneratedCouples, false)));
+            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexDisjointUnion(sym_diff_up[r], generated_up[r], rotationGeneratedCouples, false)));
+            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexDisjointUnion(sym_diff_down[r], generated_down[r], rotationGeneratedCouples, false)));
         }
 
         for (int r = 0; r < number_rotation; r++) {
-            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexUnion(sym_diff_up[r], eliminated_up[r], rotationEliminatedCouples, false)));
-            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexUnion(sym_diff_down[r], eliminated_down[r], rotationEliminatedCouples, false)));
+            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexDisjointUnion(sym_diff_up[r], eliminated_up[r], rotationEliminatedCouples, false)));
+            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexDisjointUnion(sym_diff_down[r], eliminated_down[r], rotationEliminatedCouples, false)));
         }
 
         for (int r = 0; r < number_rotation; r++) {
@@ -118,7 +117,7 @@ public class CPModel {
         }
 
 
-        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, compGraph, false)));
+        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, compGraph)));
 
 
         // OBJECTIVE
@@ -244,19 +243,19 @@ public class CPModel {
         // CONSTRAINTS
 
         for (int r = 0; r < number_rotation_up; r++) {
-            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexUnion(sym_diff_up[r], generated_up[r], rotationGeneratedCouples, false)));
+            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexDisjointUnion(sym_diff_up[r], generated_up[r], rotationGeneratedCouples, false)));
         }
 
         for (int r = 0; r < number_rotation_down; r++) {
-            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexUnion(sym_diff_down[r], generated_down[r], rotationGeneratedCouples, false)));
+            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexDisjointUnion(sym_diff_down[r], generated_down[r], rotationGeneratedCouples, false)));
         }
 
         for (int r = 0; r < number_rotation_up; r++) {
-            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexUnion(sym_diff_up[r], eliminated_up[r], rotationEliminatedCouples, false)));
+            model.post(new Constraint("IndexUnion_up_{r}", new PropIndexDisjointUnion(sym_diff_up[r], eliminated_up[r], rotationEliminatedCouples, false)));
         }
 
         for (int r = 0; r < number_rotation_down; r++) {
-            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexUnion(sym_diff_down[r], eliminated_down[r], rotationEliminatedCouples, false)));
+            model.post(new Constraint("IndexUnion_down_{r}", new PropIndexDisjointUnion(sym_diff_down[r], eliminated_down[r], rotationEliminatedCouples, false)));
         }
 
         for (int r = 0; r < number_rotation_up; r++) {
@@ -276,7 +275,7 @@ public class CPModel {
         }
 
 
-        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, compGraph, false)));
+        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, compGraph)));
 
 
         // OBJECTIVE

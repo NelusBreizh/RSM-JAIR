@@ -3,6 +3,8 @@ package org.example;
 import org.chocosolver.util.objects.graphs.DirectedGraph;
 import org.chocosolver.util.objects.graphs.UndirectedGraph;
 import org.chocosolver.util.objects.setDataStructures.SetType;
+import org.example.manyToMany.CPInstance;
+import org.example.manyToMany.ProcessInstance;
 import org.javatuples.Pair;
 import org.jgrapht.experimental.dag.DirectedAcyclicGraph;
 
@@ -19,6 +21,40 @@ import java.time.LocalDateTime;
 public class Main {
     public static void main(String[] args) throws FileNotFoundException, UnsupportedEncodingException, DirectedAcyclicGraph.CycleFoundException, IOException
     {
+        //        for (int i = 0; i < 10; i++) {
+//            int[] permutation = PreferanceGeneration.customRPG(10, false);
+//            System.out.println(Arrays.toString(permutation));
+//        }
+        int N = 1500;
+        int C = 1;
+        int[] maleCap = new int[N];
+        Arrays.fill(maleCap, C);
+        int[] femaleCap = new int[N];
+        Arrays.fill(femaleCap, C);
+
+        // Old Preference Generator
+        int[][][] preferences = generateLists(N);
+        int[][] malePref = preferences[0];
+        int[][] femalePref = preferences[1];
+
+        long time = System.currentTimeMillis();
+        ProcessInstance instance = new ProcessInstance(malePref, femalePref, maleCap, femaleCap);
+        instance.runProcedure();
+        System.out.printf("Number of Rotations: %d | Presolving Time: %d ms \n", instance.metaRotations.size(), System.currentTimeMillis() - time);
+
+        // naive CP run
+        CPInstance cp = new CPInstance(instance);
+        cp.runNaive = true;
+        cp.timeLimit = "60s";
+        cp.solve();
+        System.out.printf("Optimal Value: %d | Time to Best Solution: %f s | Solving Time: %f s\n", (int) cp.optValue, cp.timeBestSolution, cp.solveTime);
+
+        // reduced CP run + Preprocessing step 2
+        cp = new CPInstance(instance);
+        cp.runNaive = false;
+        cp.timeLimit = "60s";
+        cp.solve();
+        System.out.printf("Upper Bound: %d | Optimal Value: %d | Time to Best Solution: %f s | Solving Time: %f s | Presolving Time: %f s\n", cp.OptUB + 1,(int) cp.optValue, cp.timeBestSolution, cp.solveTime, cp.preProcessTime);
     }
 
     public static int[][][] generateLists(int n) throws FileNotFoundException, UnsupportedEncodingException
@@ -37,13 +73,13 @@ public class Main {
             {
                 if(j == 0)
                 {
-                    rand = (int) (Math.random() * N) + 1;
+                    rand = (int) (Math.random() * N);
                     set.add(rand);
                 }
                 else
                 {
                     while(set.contains(rand))
-                        rand = (int) (Math.random() * N) + 1;
+                        rand = (int) (Math.random() * N);
                     set.add(rand);
                 }
                 manPreferenceList[i][j] = rand;
@@ -59,13 +95,13 @@ public class Main {
             {
                 if(j == 0)
                 {
-                    rand = (int) (Math.random() * N) + 1;
+                    rand = (int) (Math.random() * N);
                     set.add(rand);
                 }
                 else
                 {
                     while(set.contains(rand))
-                        rand = (int) (Math.random() * N) + 1;
+                        rand = (int) (Math.random() * N);
                     set.add(rand);
                 }
                 womanPreferenceList[i][j] = rand;

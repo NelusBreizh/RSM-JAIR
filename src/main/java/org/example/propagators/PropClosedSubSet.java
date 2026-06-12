@@ -1,13 +1,10 @@
 package org.example.propagators;
 
-import java.util.Arrays;
-
+import org.chocosolver.solver.Cause;
 import org.chocosolver.solver.constraints.Propagator;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
-import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.SetVar;
-import org.chocosolver.solver.variables.Variable;
 import org.chocosolver.solver.variables.delta.ISetDeltaMonitor;
 import org.chocosolver.solver.variables.events.PropagatorEventType;
 import org.chocosolver.solver.variables.events.SetEventType;
@@ -22,8 +19,8 @@ public class PropClosedSubSet extends Propagator<SetVar> {
     //***********************************************************************************
 
     private final SetVar subSet;
+    private final int offSet;
     private final DirectedGraph poSet;
-    private final boolean notEmpty;
     private final ISetDeltaMonitor sdm;
     private final IntProcedure subSetForced;
     private final IntProcedure subSetRemoved;
@@ -32,30 +29,36 @@ public class PropClosedSubSet extends Propagator<SetVar> {
     // CONSTRUCTORS
     //***********************************************************************************
 
+    public PropClosedSubSet(SetVar subSet, DirectedGraph poSet) {
+        this(subSet, 0, poSet);
+    }
+
     /**
-     * Assures subSet is a closed subset according to poSet
+     * Ensures subSet is a closed subset according to poSet
      *
      * @param subSet   set variable
-     * @param poSet    the graph representing the partial ordered set
-     * @param notEmpty true : the set variable cannot be empty
-     *                 false : the set may be empty
+     * @param offset   int representing the offset of subSet compare to the nodes in poSet (0..n-1)
+     * @param poSet    the directed acyclic graph (DAG) representing a partially ordered set.
+     *                 For performance purposes, the DAG should be its own transitive reduction
      */
-    public PropClosedSubSet(SetVar subSet, DirectedGraph poSet, boolean notEmpty) {
-        super(new SetVar[]{subSet}, PropagatorPriority.BINARY, true);
-        this.subSet = (SetVar) subSet;
+    public PropClosedSubSet(SetVar subSet, int offset, DirectedGraph poSet) {
+        super(new SetVar[]{subSet}, PropagatorPriority.UNARY, true);
+        this.subSet = subSet;
+        this.offSet = offset;
         this.poSet = poSet;
-        this.notEmpty = notEmpty;
         this.sdm = this.subSet.monitorDelta(this);
 
-        // PROCEDURES
+        // DYNAMIC PROCEDURES
         this.subSetForced = element -> {
-            for (int u : poSet.getPredecessorsOf(element)) {
-                subSet.force(u, this);
+            for (int pred : poSet.getPredecessorsOf(element - offSet)) {
+                // The cause is null to allow self propagation
+                subSet.force(pred + offset, Cause.Null);
             }
         };
         this.subSetRemoved = element -> {
-            for (int v : poSet.getSuccessorsOf(element)) {
-                subSet.remove(v, this);
+            for (int succ : poSet.getSuccessorsOf(element - offSet)) {
+                // The cause is null to allow self propagation
+                subSet.remove(succ + offSet, Cause.Null);
             }
         };
     }
@@ -67,27 +70,28 @@ public class PropClosedSubSet extends Propagator<SetVar> {
     @Override
     public void propagate(int evtmask) throws ContradictionException {
         if (PropagatorEventType.isFullPropagation(evtmask)) {
-            ISetIterator iter = subSet.getLB().iterator();
-            while (iter.hasNext()) {
-                int v = iter.nextInt();
-                for (int u : poSet.getPredecessorsOf(v)) {
-                    if (!(subSet.getLB().contains(u))) {
-                        subSet.force(u, this);
-                    }
-                }
-            }
-
-            iter = subSet.getUB().iterator();
-            while (iter.hasNext()) {
-                int v = iter.nextInt();
-                for (int u : poSet.getPredecessorsOf(v)) {
-                    if (subSet.getUB().contains(v) && !(subSet.getUB().contains(u))) {
-                        subSet.remove(v, this);
-                        break;
-                    }
-                }
-            }
+            cleanSubSet();
+            // Start monitoring to allow self propagation after the initial propagator call
             sdm.startMonitoring();
+            for (int x = 0; x < poSet.getNbMaxNodes(); x++) {
+                if (subSet.getLB().contains(x + offSet)) {
+                    subSetForced.execute(x + offSet);
+                }
+                if (!subSet.getUB().contains(x + offSet)) {
+                    subSetRemoved.execute(x + offSet);
+                }
+            }
+        }
+    }
+
+    public void cleanSubSet() throws ContradictionException {
+        int val;
+        ISetIterator valIter = subSet.getUB().iterator();
+        while (valIter.hasNext()) {
+            val = valIter.nextInt();
+            if (val  - offSet < 0 || val - offSet >= poSet.getNbMaxNodes()) {
+                subSet.remove(val, this);
+            }
         }
     }
 
@@ -101,25 +105,16 @@ public class PropClosedSubSet extends Propagator<SetVar> {
 
     @Override
     public ESat isEntailed() {
-        if (subSet.getUB().size() == 0) {
-            if (notEmpty) {
-                return ESat.FALSE;
-            } else {
-                return ESat.TRUE;
-            }
-        }
-
-        ISetIterator iter = subSet.getLB().iterator();
-        while (iter.hasNext()) {
-            int v = iter.nextInt();
-            for (int u : poSet.getPredecessorsOf(v)) {
-                if (!(subSet.getUB().contains(u))) {
-                    return ESat.FALSE;
+        if (isCompletelyInstantiated()) {
+            ISetIterator iter = subSet.getLB().iterator();
+            while (iter.hasNext()) {
+                int x = iter.nextInt();
+                for (int pred : poSet.getPredecessorsOf(x)) {
+                    if (!(subSet.getUB().contains(pred))) {
+                        return ESat.FALSE;
+                    }
                 }
             }
-        }
-
-        if (isCompletelyInstantiated()) {
             return ESat.TRUE;
         }
         return ESat.UNDEFINED;
