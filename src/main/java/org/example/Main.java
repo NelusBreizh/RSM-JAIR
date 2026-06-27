@@ -1,19 +1,15 @@
 package org.example;
 
-import org.chocosolver.util.objects.graphs.DirectedGraph;
-import org.chocosolver.util.objects.graphs.UndirectedGraph;
-import org.chocosolver.util.objects.setDataStructures.SetType;
 import org.example.manyToMany.CPInstance;
+import org.example.manyToMany.LocalSearch;
 import org.example.manyToMany.ProcessInstance;
-import org.javatuples.Pair;
+import org.example.manyToMany.ReducedLocalSearch;
 import org.jgrapht.experimental.dag.DirectedAcyclicGraph;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
-import java.time.LocalDateTime;
 
 
 // Press Shift twice to open the Search Everywhere dialog and type `show whitespaces`,
@@ -25,8 +21,8 @@ public class Main {
 //            int[] permutation = PreferanceGeneration.customRPG(10, false);
 //            System.out.println(Arrays.toString(permutation));
 //        }
-        int N = 1500;
-        int C = 1;
+        int N = 500;
+        int C = 10;
         int[] maleCap = new int[N];
         Arrays.fill(maleCap, C);
         int[] femaleCap = new int[N];
@@ -37,24 +33,38 @@ public class Main {
         int[][] malePref = preferences[0];
         int[][] femalePref = preferences[1];
 
-        long time = System.currentTimeMillis();
+//        long time = System.currentTimeMillis();
         ProcessInstance instance = new ProcessInstance(malePref, femalePref, maleCap, femaleCap);
-        instance.runProcedure();
-        System.out.printf("Number of Rotations: %d | Presolving Time: %d ms \n", instance.metaRotations.size(), System.currentTimeMillis() - time);
+        instance.constructMetaRotationPoset();
+        System.out.printf("Number of Rotations: %d | Number of Pairs: %d | Pre-processing 1 Time: %f s \n", instance.metaRotations.size(), instance.rotationOX.size(), instance.preProcessingOneTime);
 
-        // naive CP run
+        long timeLimitLong = 60000;
+        String timeLimitString = "60s";
+
+        // basic CP run
         CPInstance cp = new CPInstance(instance);
         cp.runNaive = true;
-        cp.timeLimit = "60s";
+        cp.timeLimit = timeLimitString;
         cp.solve();
-        System.out.printf("Optimal Value: %d | Time to Best Solution: %f s | Solving Time: %f s\n", (int) cp.optValue, cp.timeBestSolution, cp.solveTime);
+        System.out.printf("CP RUN WITHOUT PRE-PROCESSING --> Optimal Value: %d | Time to Best Solution: %f s | Solving Time: %f s | Status: %s\n", (int) cp.optValue, cp.timeBestSolution, cp.solveTime, cp.chocoStatus == 0 ? "TERMINATED" : "STOPPED");
+
+        // basic LS run
+        LocalSearch ls = new LocalSearch(instance);
+        ls.generalProcedure(timeLimitLong, 50, 10000);
+        System.out.printf("LS RUN WITHOUT PRE-PROCESSING --> Best Value: %d | Time to Best Solution: %fs\n", ls.bestValue, (float) ls.timeBestSolution / 1000);
 
         // reduced CP run + Preprocessing step 2
         cp = new CPInstance(instance);
         cp.runNaive = false;
-        cp.timeLimit = "60s";
+        cp.timeLimit = timeLimitString;
         cp.solve();
-        System.out.printf("Upper Bound: %d | Optimal Value: %d | Time to Best Solution: %f s | Solving Time: %f s | Presolving Time: %f s\n", cp.OptUB + 1,(int) cp.optValue, cp.timeBestSolution, cp.solveTime, cp.preProcessTime);
+        System.out.printf("b(M_0) = %d | b(M_Z) = %d | b(lower_median) = %d | b(upper_median) = %d | Relevant Pairs: %d | Rotations Up: %d | Rotations Down: %d | Search Space: %d | Pre-processing 2 Time: %fs\n", cp.M0b, cp.MZb, cp.lowerMedianB, cp.upperMedianB, cp.reducedRotationOX.size(), cp.reducedRotation_up.length, cp.reducedRotation_down.length, cp.SuperstableUB.length - cp.SuperstableLB.length , cp.preProcessingTwoTime);
+        System.out.printf("CP RUN AFTER PRE-PROCESSING --> Optimal Value: %d | Time to Best Solution: %fs | Solving Time: %fs | Status: %s\n", (int) cp.optValue, cp.timeBestSolution, cp.solveTime, cp.chocoStatus == 0 ? "TERMINATED" : "STOPPED");
+
+        // reduced LS run
+        ReducedLocalSearch rls = new ReducedLocalSearch(instance, cp);
+        rls.generalProcedure(timeLimitLong, 50, 10000);
+        System.out.printf("LS RUN WITHOUT PRE-PROCESSING --> Best Value: %d | Time to Best Solution: %fs\n", rls.bestValue, (float) rls.timeBestSolution / 1000);
     }
 
     public static int[][][] generateLists(int n) throws FileNotFoundException, UnsupportedEncodingException

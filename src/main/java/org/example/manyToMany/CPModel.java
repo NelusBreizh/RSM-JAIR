@@ -16,7 +16,7 @@ import java.util.*;
 
 public class CPModel {
 
-    public static float[] run_naive_model(int number_couples, int number_rotation, DirectedGraph compGraph, Map<Pair<Integer, Integer>, Pair<Integer, Integer>> rotationOX, int[][] rotationGeneratedCouples, int[][] rotationEliminatedCouples, int[][] S_up, int[][] S_down, int[] M_LB, int[] M_UB, int b_LB, int b_UB, int b_threshold, String timeLimit) {
+    public static float[] run_naive_model(int number_couples, int number_rotation, DirectedGraph poSet, Map<Pair<Integer, Integer>, Pair<Integer, Integer>> rotationOX, int[][] rotationGeneratedCouples, int[][] rotationEliminatedCouples, int[][] S_up, int[][] S_down, int[] M_LB, int[] M_UB, int b_LB, int b_UB, int b_threshold, String timeLimit) {
         // DATA
 
         int[] rotations = new int[number_rotation];
@@ -96,8 +96,8 @@ public class CPModel {
         // CONSTRAINTS
 
         for (int r = 0; r < number_rotation; r++) {
-            model.post(new Constraint("SymDiff_up_[" + r + "]", new PropSetDifference(sym_diff_up[r], M, S_up_var[r], false)));
-            model.post(new Constraint("SymDiff_down_[" + r + "]", new PropSetDifference(sym_diff_down[r], S_down_var[r], M, false)));
+            model.post(new Constraint("SymDiff_up_[" + r + "]", new PropSetDifference(sym_diff_up[r], M, S_up_var[r])));
+            model.post(new Constraint("SymDiff_down_[" + r + "]", new PropSetDifference(sym_diff_down[r], S_down_var[r], M)));
         }
 
 
@@ -112,12 +112,12 @@ public class CPModel {
         }
 
         for (int r = 0; r < number_rotation; r++) {
-            model.post(new Constraint("Diff_up_{r}", new PropSetDifference(couples_up[r], generated_up[r], eliminated_up[r], false)));
-            model.post(new Constraint("Diff_down_{r}", new PropSetDifference(couples_down[r], generated_down[r], eliminated_down[r], false)));
+            model.post(new Constraint("Diff_up_{r}", new PropSetDifference(couples_up[r], generated_up[r], eliminated_up[r])));
+            model.post(new Constraint("Diff_down_{r}", new PropSetDifference(couples_down[r], generated_down[r], eliminated_down[r])));
         }
 
 
-        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, compGraph)));
+        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, poSet)));
 
 
         // OBJECTIVE
@@ -157,7 +157,7 @@ public class CPModel {
         }
     }
 
-    public static float[] run_model_with_reduced_variables(int number_couples, int number_rotation, DirectedGraph compGraph, Map<Pair<Integer, Integer>, Pair<Integer, Integer>> reducedOX, int[][] rotationGeneratedCouples, int[][] rotationEliminatedCouples, int[][] S_up, int[][] S_down, int[] rotation_up, int[] rotation_down, int[] M_LB, int[] M_UB, int b_LB, int b_UB, int b_threshold) {
+    public static float[] run_model_with_reduced_variables(int number_couples, int number_rotation, DirectedGraph poSet, Map<Pair<Integer, Integer>, Pair<Integer, Integer>> reducedOX, int[][] rotationGeneratedCouples, int[][] rotationEliminatedCouples, int[][] S_up, int[][] S_down, int[] rotation_up, int[] rotation_down, int[] M_LB, int[] M_UB, int b_LB, int b_UB, int b_threshold) {
         // DATA
         int[] rotations = new int[number_rotation];
         for (int r = 0; r < number_rotation; r++) {
@@ -259,23 +259,23 @@ public class CPModel {
         }
 
         for (int r = 0; r < number_rotation_up; r++) {
-            model.post(new Constraint("Couples_up_[" + r + "]", new PropSetDifference(couples_up[r], generated_up[r], eliminated_up[r], false)));
+            model.post(new Constraint("Couples_up_[" + r + "]", new PropSetDifference(couples_up[r], generated_up[r], eliminated_up[r])));
         }
 
         for (int r = 0; r < number_rotation_down; r++) {
-            model.post(new Constraint("Couples_down_[" + r + "]", new PropSetDifference(couples_down[r], generated_down[r], eliminated_down[r], false)));
+            model.post(new Constraint("Couples_down_[" + r + "]", new PropSetDifference(couples_down[r], generated_down[r], eliminated_down[r])));
         }
 
         for (int r = 0; r < number_rotation_up; r++) {
-            model.post(new Constraint("SymDiff_up_[" + r + "]", new PropSetDifference(sym_diff_up[r], M, S_up_var[r], false)));
+            model.post(new Constraint("SymDiff_up_[" + r + "]", new PropSetDifference(sym_diff_up[r], M, S_up_var[r])));
         }
 
         for (int r = 0; r < number_rotation_down; r++) {
-            model.post(new Constraint("SymDiff_down_[" + r + "]", new PropSetDifference(sym_diff_down[r], S_down_var[r], M, false)));
+            model.post(new Constraint("SymDiff_down_[" + r + "]", new PropSetDifference(sym_diff_down[r], S_down_var[r], M)));
         }
 
 
-        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, compGraph)));
+        model.post(new Constraint("closedSubset", new PropClosedSubSet(M, poSet)));
 
 
         // OBJECTIVE

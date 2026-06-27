@@ -1,6 +1,5 @@
 package org.example.manyToMany;
 
-import org.example.manyToMany.CPModel;
 import org.javatuples.Pair;
 
 import java.util.ArrayList;
@@ -25,8 +24,10 @@ public class CPInstance {
     public int[] SuperstableUB;
     public int OptLB;
     public int OptUB;
-    public ArrayList<Integer> medianUpDown;
-    public int medianB;
+    public ArrayList<Integer> lowerMedianUpDown;
+    public int lowerMedianB;
+    public ArrayList<Integer> upperMedianUpDown;
+    public int upperMedianB;
     public int M0b;
     public int MZb;
     public float optValue;
@@ -35,10 +36,11 @@ public class CPInstance {
     public float NbNodes;
     public int b_threshold;
     public float time_threshold;
-    public float preProcessTime;
+    public float preProcessingTwoTime;
     public float solveTime;
     public String timeLimit;
-    public float solveStatus;
+    public float chocoStatus;
+    public String status;
 
     public CPInstance(ProcessInstance instance) {
         this.instance = instance;
@@ -63,26 +65,33 @@ public class CPInstance {
         this.reducedRotation_down = new int[]{};
         this.NoDeletedUp = 0;
         this.NoDeletedDown = 0;
-        this.medianUpDown = new ArrayList<>();
-        this.medianB = 0;
+        this.lowerMedianUpDown = new ArrayList<>();
+        this.lowerMedianB = 0;
+        this.upperMedianUpDown = new ArrayList<>();
+        this.upperMedianB = 0;
         this.M0b = 0;
         this.MZb = 0;
         this.b_threshold = 0;
         this.time_threshold = 0;
-        this.preProcessTime = 0;
+        this.preProcessingTwoTime = 0;
         this.solveTime = 0;
         this.timeLimit = "none";
-        this.solveStatus = 0;
+        this.chocoStatus = 0;
+        this.status = "NOT SOLVED YET";
     }
 
     public void solve() {
         float[] output;
-        if (runNaive) {
+        if (numberRotations == 0) {
+            this.status = "THERE ARE NO ROTATIONS";
+            System.out.println("There is a unique stable matching");
+        }
+        else if (runNaive) {
             optValue = 0;
             OptLB = 1;
             OptUB = instance.malesN * instance.femalesN - 1;
             long start = System.currentTimeMillis();
-            output = CPModel.run_naive_model(numberCouples, numberRotations, instance.compGraph, instance.rotationOX, instance.rotationGeneratedCouples, instance.rotationEliminatedCouples, instance.Sup, instance.Sdown, this.SuperstableLB, this.SuperstableUB, this.OptLB, this.OptUB, this.b_threshold, this.timeLimit);
+            output = CPModel.run_naive_model(numberCouples, numberRotations, instance.metaRotationPoset, instance.rotationOX, instance.rotationGeneratedCouples, instance.rotationEliminatedCouples, instance.Sup, instance.Sdown, this.SuperstableLB, this.SuperstableUB, this.OptLB, this.OptUB, this.b_threshold, this.timeLimit);
             this.solveTime = System.currentTimeMillis() - start;
             this.solveTime = this.solveTime / 1000;
             this.optValue = output[0];
@@ -90,33 +99,36 @@ public class CPInstance {
             this.NbVariables = output[2];
             this.NbNodes = output[3];
             this.time_threshold = output[4];
-            this.solveStatus = output[5];
+            this.chocoStatus = output[5];
+            this.status = "SOLVED WITHOUT PREPROCESSING";
 
         } else {
             optValue = 0;
             OptLB = 1;
             OptUB = instance.malesN * instance.femalesN - 1;
             long start = System.currentTimeMillis();
-            long start_bis = System.currentTimeMillis();
             reduceVariables();
-            start_bis = System.currentTimeMillis();
             computeMO();
-            start_bis = System.currentTimeMillis();
             computeMZ();
-            start_bis = System.currentTimeMillis();
-            computeMedianUpDown();
-            start_bis = System.currentTimeMillis();
-            reduceDomains();
-            if (medianB == OptLB || M0b == OptLB || MZb == OptLB || !(checkBoundValidity())) {
+            computeMedianUpDown(false);
+            computeMedianUpDown(true);
+            reduceSearchSpace();
+            if (lowerMedianB == OptLB || upperMedianB == OptLB || M0b == OptLB || MZb == OptLB || !(checkBoundValidity())) {
                 if (M0b == OptLB || M0b - 1 == OptUB) {
                     System.out.println("M_O is optimal");
                     optValue = M0b;
                     NbVariables = 0;
                     NbNodes = 0;
                 }
-                if (medianB == OptLB || medianB - 1 == OptUB) {
-                    System.out.println("Median UP/DOWN is optimal");
-                    optValue = medianB;
+                if (lowerMedianB == OptLB || lowerMedianB - 1 == OptUB) {
+                    System.out.println("Lower-median UP/DOWN is optimal");
+                    optValue = lowerMedianB;
+                    NbVariables = 0;
+                    NbNodes = 0;
+                }
+                if (upperMedianB == OptLB || upperMedianB - 1 == OptUB) {
+                    System.out.println("Upper-median UP/DOWN is optimal");
+                    optValue = upperMedianB;
                     NbVariables = 0;
                     NbNodes = 0;
                 }
@@ -126,13 +138,14 @@ public class CPInstance {
                     NbVariables = 0;
                     NbNodes = 0;
                 }
-                this.preProcessTime = System.currentTimeMillis() - start;
-                this.preProcessTime = preProcessTime / 1000;
+                this.preProcessingTwoTime = System.currentTimeMillis() - start;
+                this.preProcessingTwoTime = preProcessingTwoTime / 1000;
+                this.status = "A HEURISTIC IS OPTIMAL";
             } else {
-                this.preProcessTime = System.currentTimeMillis() - start;
-                this.preProcessTime = preProcessTime / 1000;
+                this.preProcessingTwoTime = System.currentTimeMillis() - start;
+                this.preProcessingTwoTime = preProcessingTwoTime / 1000;
                 start = System.currentTimeMillis();
-                output = CPModel.run_model_with_reduced_variables(this.numberCouples, this.numberRotations, instance.compGraph, this.reducedRotationOX, instance.rotationGeneratedCouples, instance.rotationEliminatedCouples, instance.Sup, instance.Sdown, this.reducedRotation_up, this.reducedRotation_down, this.SuperstableLB, this.SuperstableUB, this.OptLB, this.OptUB, this.b_threshold);
+                output = CPModel.run_model_with_reduced_variables(this.numberCouples, this.numberRotations, instance.metaRotationPoset, this.reducedRotationOX, instance.rotationGeneratedCouples, instance.rotationEliminatedCouples, instance.Sup, instance.Sdown, this.reducedRotation_up, this.reducedRotation_down, this.SuperstableLB, this.SuperstableUB, this.OptLB, this.OptUB, this.b_threshold);
                 this.solveTime = System.currentTimeMillis() - start;
                 this.solveTime = solveTime / 1000;
                 this.optValue = output[0];
@@ -140,6 +153,7 @@ public class CPInstance {
                 this.NbVariables = output[2];
                 this.NbNodes = output[3];
                 this.time_threshold = output[4];
+                this.status = "SOLVED WITH CP AFTER PREPROCESSING";
             }
         }
     }
@@ -153,21 +167,22 @@ public class CPInstance {
         return true;
     }
 
-    public void computeMedianUpDown() {
-        HashSet<Integer> median = new HashSet<>();
+    public void computeMedianUpDown(boolean upper) {
+        ArrayList<Integer> median = upper ? upperMedianUpDown : lowerMedianUpDown;
+        median.clear();
         for (int rho = 0; rho < numberRotations; rho++) {
-            if (instance.Sup[rho].length + instance.Sdown[rho].length < numberRotations) {
+            if (instance.Sup[rho].length + instance.Sdown[rho].length < numberRotations + (upper ? 1 : 0)) {
                 median.add(rho);
             }
         }
-        this.medianUpDown.addAll(median);
-        this.medianB = computeB(medianUpDown);
-        if (medianB - 1 < OptUB) {OptUB = medianB - 1;}
+        int b = computeB(median);
+        if (upper) {upperMedianB = b;} else {lowerMedianB = b;}
+        OptUB = Math.min(b - 1, OptUB);
     }
 
     public void computeMO() {
         this.M0b = computeB(new ArrayList<>());
-        if (M0b- 1 < OptUB) {OptUB = M0b - 1;}
+        if (M0b - 1 < OptUB) {OptUB = M0b - 1;}
     }
 
     public void computeMZ() {
@@ -176,7 +191,7 @@ public class CPInstance {
             rotations.add(i);
         }
         this.MZb = computeB(rotations);
-        if (MZb- 1 < OptUB) {OptUB = MZb - 1;}
+        if (MZb - 1 < OptUB) {OptUB = MZb - 1;}
     }
 
     public int computeB (ArrayList<Integer> closedSubset) {
@@ -299,7 +314,7 @@ public class CPInstance {
         return generated.size();
     }
 
-    public void reduceDomains() {
+    public void reduceSearchSpace() {
         HashSet<Integer> lowerBound = new HashSet<>();
         HashSet<Integer> upperBound = new HashSet<>();
         for (int i : SuperstableUB) {upperBound.add(i);}

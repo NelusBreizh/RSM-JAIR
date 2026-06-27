@@ -1,10 +1,8 @@
 package org.example.manyToMany;
 
-import org.chocosolver.util.objects.graphs.DirectedGraph;
 import org.javatuples.Pair;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 
 public class ReducedLocalSearch {
@@ -15,7 +13,7 @@ public class ReducedLocalSearch {
     public int bestValue;
     public ArrayList<Integer> currentMatching;
     public int currentValue;
-    public long timeBestSolution;
+    public long timeBestSolution; // milliseconds
     public int[] bounded_space;
     public boolean valid_bounded_space;
 
@@ -57,6 +55,7 @@ public class ReducedLocalSearch {
         bestMatching = new ArrayList<>();
         bestMatching.addAll(currentMatching);
         bestValue = currentValue;
+        timeBestSolution = System.currentTimeMillis() - startTime;
         int count = 0;
         int iter;
         while (System.currentTimeMillis() - startTime < timeLimit) {
@@ -119,17 +118,18 @@ public class ReducedLocalSearch {
     }
 
     private HashSet<Integer> diffUp(ArrayList<Integer> M, int rho) {
-        HashSet<Integer> diff = new HashSet<>();
-        for (int e : M) {
-            if (!(contains(instance.Sup[rho], e))) {diff.add(e);}
+        HashSet<Integer> diff = new HashSet<>(M);
+        for (int e : instance.Sup[rho]) {
+            diff.remove(e);
         }
         return diff;
     }
 
     private HashSet<Integer> diffDown(ArrayList<Integer> M, int rho) {
         HashSet<Integer> diff = new HashSet<>();
-        for (int e : instance.Sdown[rho]) {
-            if (!(M.contains(e))) {diff.add(e);}
+        for (int e : instance.Sdown[rho]) {diff.add(e);}
+        for (int e : M) {
+            diff.remove(e);
         }
         return diff;
     }

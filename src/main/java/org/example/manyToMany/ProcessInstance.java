@@ -4,10 +4,7 @@ import org.chocosolver.util.objects.graphs.DirectedGraph;
 import org.chocosolver.util.objects.setDataStructures.SetType;
 import org.javatuples.Pair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class ProcessInstance {
     public int malesN;
@@ -28,13 +25,14 @@ public class ProcessInstance {
     public int[][] nodeDominated;
     public HashMap<Pair<Integer, Integer>, Integer> labels;
     public HashMap<Pair<Integer, Integer>, Pair<Integer, Integer>> rotationOX;
-    public HashMap<Pair<Integer, Integer>, Integer> coupleIndex;
-    public ArrayList<Pair<Integer, Integer>> indexCouple;
+    public HashMap<Pair<Integer, Integer>, Integer> pairToIndex;
+    public ArrayList<Pair<Integer, Integer>> indexToPair;
     public DirectedGraph compGraph;
     public int[][] Sup;
     public int[][] Sdown;
     public int[][] rotationGeneratedCouples;
     public int[][] rotationEliminatedCouples;
+    public float preProcessingOneTime;
 
 
 
@@ -54,97 +52,31 @@ public class ProcessInstance {
         this.rotationOX = new HashMap<>();
     }
 
-    public void runProcedure() {
+    public void constructMetaRotationPoset() {
+        long startTime = System.currentTimeMillis();
+
+        // Construct the meta-rotation poset
         getMaleOptimalMatching();
         initialPruning();
         findAllRotations();
-        getCoupleIndex();
+        // Create the additional data structures
+        linkPairsWithIndices();
         getComparibilityGraph();
-        getSup();
-        getSdown();
-        getRotationGeneratedCouples();
-        getRotationEliminatedCouples();
+        initialiseSup();
+        initialiseSdown();
+        initialiseRotationGeneratedCouples();
+        initialiseRotationEliminatedCouples();
+
+        preProcessingOneTime = System.currentTimeMillis() - startTime;
+        preProcessingOneTime = preProcessingOneTime / 1000;
     }
 
-    public void getCoupleIndex() {
-        this.coupleIndex = new HashMap<>();
-        this.indexCouple = new ArrayList<>();
-        int index = 0;
-        for (Pair<Integer,Integer> couple : rotationOX.keySet()) {
-            coupleIndex.put(couple, index);
-            indexCouple.add(couple);
-            index++;
-        }
-    }
 
-    public void getComparibilityGraph() {
-        this.compGraph = new DirectedGraph(metaRotations.size(), SetType.BITSET, true);
-        for (int u = 0; u < metaRotations.size(); u++) {
-            for (int v : metaRotationPoset.getSuccessorsOf(u)) {
-                compGraph.addEdge(u, v);
-                for (int w : compGraph.getPredecessorsOf(u)) {
-                    compGraph.addEdge(w, v);
-                }
-            }
-        }
-    }
+    //***********************************************************************************
+    // METHODS FOR CONSTRUCTING THE META-ROTATION POSET
+    //***********************************************************************************
 
-    public void  getSup() {
-        Sup = new int[metaRotations.size()][];
-        for (int node : compGraph.getNodes()) {
-            Set<Integer> rotations = new HashSet<>();
-            for (int i = 0; i < metaRotations.size(); i++){
-                rotations.add(i);
-            }
-            rotations.remove(node);
-            for (int rotation : compGraph.getSuccessorsOf(node)){
-                rotations.remove(rotation);
-            }
-            Sup[node] = rotations.stream().mapToInt(Integer::intValue).toArray();
-        }
-    }
-
-    public void getSdown() {
-        Sdown = new int[metaRotations.size()][];
-        for (int node : compGraph.getNodes()) {
-            Set<Integer> rotations = new HashSet<>();
-            rotations.add(node);
-            for (int rotation : compGraph.getPredecessorsOf(node)){
-                rotations.add(rotation);
-            }
-            Sdown[node] = rotations.stream().mapToInt(Integer::intValue).toArray();
-        }
-    }
-
-    public void getRotationGeneratedCouples() {
-        this.rotationGeneratedCouples = new int[metaRotations.size()][];
-        int iter = 0;
-        for (ArrayList<Pair<Integer, Integer>> rho : metaRotations) {
-            int[] temp = new int[rho.size()];
-            for (int i = 0; i < rho.size(); i++) {
-                temp[i] = coupleIndex.get(new Pair<>(rho.get(i).getValue0(), rho.get((i + 1) % rho.size()).getValue1()));
-            }
-            rotationGeneratedCouples[iter] = temp;
-            iter++;
-        }
-    }
-
-    public void getRotationEliminatedCouples() {
-        this.rotationEliminatedCouples = new int[metaRotations.size()][];
-        int iter1 = 0;
-        for (ArrayList<Pair<Integer, Integer>> rho : metaRotations) {
-            int[] temp = new int[rho.size()];
-            int iter2 = 0;
-            for (Pair<Integer,Integer> couple : rho) {
-                temp[iter2] = coupleIndex.get(couple);
-                iter2++;
-            }
-            rotationEliminatedCouples[iter1] = temp;
-            iter1++;
-        }
-    }
-
-    public void getMaleOptimalMatching() {
+    private void getMaleOptimalMatching() {
         int count;
         boolean update;
 
@@ -170,7 +102,7 @@ public class ProcessInstance {
         }
     }
 
-    public boolean eliminateNodes() {
+    private boolean eliminateNodes() {
         int count;
         boolean update = false;
 
@@ -229,13 +161,13 @@ public class ProcessInstance {
         return update;
     }
 
-    public void initialPruning() {
+    private void initialPruning() {
         int N;
         // Step A
         this.malesList = new ArrayList[malesN];
         for (int m = 0; m < malesN; m++) {
             malesList[m] = new ArrayList<>();
-            if (maleOptimalStableMatching[m].size() > 0) {
+            if (!maleOptimalStableMatching[m].isEmpty()) {
                 int last_f = maleOptimalStableMatching[m].get(maleOptimalStableMatching[m].size() - 1);
                 boolean reached = false;
                 for (int f : malesPref[m]) {
@@ -502,6 +434,106 @@ public class ProcessInstance {
                 metaRotationPoset.addEdge(rotationOX.get(new Pair<>(m, min_m)).getValue0(), label);
             }
         }
+    }
+
+
+    //***********************************************************************************
+    // METHODS FOR INITIALISING THE ADDITIONAL DATA STRUCTURES
+    //***********************************************************************************
+
+
+    public void linkPairsWithIndices() {
+        this.pairToIndex = new HashMap<>();
+        this.indexToPair = new ArrayList<>();
+        int index = 0;
+        for (Pair<Integer,Integer> couple : rotationOX.keySet()) {
+            pairToIndex.put(couple, index);
+            indexToPair.add(couple);
+            index++;
+        }
+    }
+
+    public void getComparibilityGraph() {
+        this.compGraph = new DirectedGraph(metaRotations.size(), SetType.BITSET, true);
+        for (int u = 0; u < metaRotations.size(); u++) {
+            for (int v : metaRotationPoset.getSuccessorsOf(u)) {
+                compGraph.addEdge(u, v);
+                for (int w : compGraph.getPredecessorsOf(u)) {
+                    compGraph.addEdge(w, v);
+                }
+            }
+        }
+    }
+
+    public void initialiseSup() {
+        Sup = new int[metaRotations.size()][];
+        boolean[] markRotation = new boolean[metaRotations.size()];
+        for (int node : compGraph.getNodes()) {
+            Arrays.fill(markRotation, true);
+            markRotation[node] = false;
+            for (int rotation : compGraph.getSuccessorsOf(node)){
+                markRotation[rotation] = false;
+            }
+            ArrayList<Integer> rotations = new ArrayList<>();
+            for (int rotation = 0; rotation < metaRotations.size(); rotation++) {
+                if (markRotation[rotation]) {
+                    rotations.add(rotation);
+                }
+            }
+            Sup[node] = rotations.stream()
+                    .mapToInt(Integer::intValue)
+                    .toArray();
+        }
+    }
+
+    public void initialiseSdown() {
+        Sdown = new int[metaRotations.size()][];
+        for (int node : compGraph.getNodes()) {
+            ArrayList<Integer> rotations = new ArrayList<>();
+            rotations.add(node);
+            for (int rotation : compGraph.getPredecessorsOf(node)){
+                rotations.add(rotation);
+            }
+            Sdown[node] = rotations.stream()
+                    .mapToInt(Integer::intValue)
+                    .toArray();
+        }
+    }
+
+    public void initialiseRotationGeneratedCouples() {
+        this.rotationGeneratedCouples = new int[metaRotations.size()][];
+        for (int indexRho = 0; indexRho < metaRotations.size(); indexRho++) {
+            ArrayList<Pair<Integer, Integer>> rho = metaRotations.get(indexRho);
+            int[] generatedCouples = new int[rho.size()];
+            for (int i = 0; i < rho.size(); i++) {
+                generatedCouples[i] = pairToIndex.get(new Pair<>(rho.get(i).getValue0(), rho.get((i + 1) % rho.size()).getValue1()));
+            }
+            rotationGeneratedCouples[indexRho] = generatedCouples;
+        }
+    }
+
+    public void initialiseRotationEliminatedCouples() {
+        this.rotationEliminatedCouples = new int[metaRotations.size()][];
+        for (int indexRho = 0; indexRho < metaRotations.size(); indexRho++) {
+            ArrayList<Pair<Integer, Integer>> rho = metaRotations.get(indexRho);
+            int[] eliminatedCouples = new int[rho.size()];
+            for (int i = 0; i < rho.size(); i++) {
+                eliminatedCouples[i] = pairToIndex.get(rho.get(i));
+            }
+            rotationEliminatedCouples[indexRho] = eliminatedCouples;
+        }
+    }
+
+    //***********************************************************************************
+    // UPDATES AND QUERIES FOR DATA STRUCTURES
+    //***********************************************************************************
+
+    public boolean isInSup(int rho, int query) {
+        return query != rho && !compGraph.getSuccessorsOf(rho).contains(query);
+    }
+
+    public boolean isInSdown(int rho, int query) {
+        return query == rho || compGraph.getPredecessorsOf(rho).contains(query);
     }
 
 }

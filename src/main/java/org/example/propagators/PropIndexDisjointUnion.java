@@ -78,9 +78,9 @@ public class PropIndexDisjointUnion extends Propagator<SetVar> {
         this.offSetEle = offsetEle;
         this.fixedSets = fixedsets;
         this.universeElements = new HashSet<>();
-        int tempMinEle = fixedsets[0][0];
-        int tempMaxEle = fixedsets[0][0];
-        for (int[] set : fixedsets) {
+        int tempMinEle = Integer.MAX_VALUE;
+        int tempMaxEle = Integer.MIN_VALUE;
+        for (int[] set : fixedSets) {
             for (int ele : set) {
                 tempMinEle = Math.min(tempMinEle, ele);
                 tempMaxEle = Math.max(tempMaxEle, ele);
