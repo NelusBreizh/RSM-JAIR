@@ -41,6 +41,7 @@ public class CPInstance {
     public String timeLimit;
     public float chocoStatus;
     public String status;
+    public boolean heuristicOptimal;
 
     public CPInstance(ProcessInstance instance) {
         this.instance = instance;
@@ -78,6 +79,7 @@ public class CPInstance {
         this.timeLimit = "none";
         this.chocoStatus = 0;
         this.status = "NOT SOLVED YET";
+        this.heuristicOptimal = false;
     }
 
     public void solve() {
@@ -115,25 +117,25 @@ public class CPInstance {
             reduceSearchSpace();
             if (lowerMedianB == OptLB || upperMedianB == OptLB || M0b == OptLB || MZb == OptLB || !(checkBoundValidity())) {
                 if (M0b == OptLB || M0b - 1 == OptUB) {
-                    System.out.println("M_O is optimal");
+//                    System.out.println("M_O is optimal");
                     optValue = M0b;
                     NbVariables = 0;
                     NbNodes = 0;
                 }
                 if (lowerMedianB == OptLB || lowerMedianB - 1 == OptUB) {
-                    System.out.println("Lower-median UP/DOWN is optimal");
+//                    System.out.println("Lower-median UP/DOWN is optimal");
                     optValue = lowerMedianB;
                     NbVariables = 0;
                     NbNodes = 0;
                 }
                 if (upperMedianB == OptLB || upperMedianB - 1 == OptUB) {
-                    System.out.println("Upper-median UP/DOWN is optimal");
+//                    System.out.println("Upper-median UP/DOWN is optimal");
                     optValue = upperMedianB;
                     NbVariables = 0;
                     NbNodes = 0;
                 }
                 if (MZb == OptLB || MZb - 1 == OptUB) {
-                    System.out.println("M_Z is optimal");
+//                    System.out.println("M_Z is optimal");
                     optValue = MZb;
                     NbVariables = 0;
                     NbNodes = 0;
@@ -141,6 +143,7 @@ public class CPInstance {
                 this.preProcessingTwoTime = System.currentTimeMillis() - start;
                 this.preProcessingTwoTime = preProcessingTwoTime / 1000;
                 this.status = "A HEURISTIC IS OPTIMAL";
+                this.heuristicOptimal = true;
             } else {
                 this.preProcessingTwoTime = System.currentTimeMillis() - start;
                 this.preProcessingTwoTime = preProcessingTwoTime / 1000;

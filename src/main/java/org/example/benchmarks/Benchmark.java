@@ -13,7 +13,7 @@ import static org.example.Main.generateLists;
 public class Benchmark {
 
     public static void main(String[] args) throws Exception {
-        int N = 1500;
+        int N = 5;
         int C = 1;
         int[][][] preferences = generateLists(N);
         int[][] malePref = preferences[0];
@@ -39,6 +39,11 @@ public class Benchmark {
 
         ProcessInstance instance = new ProcessInstance(malePref, femalePref, maleCap, femaleCap);
         instance.constructMetaRotationPoset();
+
+        if (instance.metaRotations.isEmpty()) {
+            return new JSONObject()
+                .put("uniqueStableMatching", true);
+        }
 
         // ================= BASE INSTANCE =================
         CPInstance cp = new CPInstance(instance);
@@ -68,6 +73,14 @@ public class Benchmark {
         cp2.timeLimit = "60s";
         cp2.solve();
 
+        if(cp2.heuristicOptimal) {
+            return new JSONObject()
+                    .put("uniqueStableMatching", false)
+                    .put("baseInstance", baseInstance)
+                    .put("heuristicOptimal", true);
+        }
+
+
         ReducedLocalSearch rls = new ReducedLocalSearch(instance, cp2);
         rls.generalProcedure(60000, 50, 10000);
 
@@ -89,7 +102,9 @@ public class Benchmark {
                         .put("timeBest", (float) rls.timeBestSolution / 1000));
 
         return new JSONObject()
+                .put("uniqueStableMatching", false)
                 .put("baseInstance", baseInstance)
+                .put("heuristicOptimal", false)
                 .put("preProcessedInstance", preProcessedInstance);
     }
 

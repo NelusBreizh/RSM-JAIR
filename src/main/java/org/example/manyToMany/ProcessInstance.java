@@ -60,13 +60,14 @@ public class ProcessInstance {
         initialPruning();
         findAllRotations();
         // Create the additional data structures
-        linkPairsWithIndices();
-        getComparibilityGraph();
-        initialiseSup();
-        initialiseSdown();
-        initialiseRotationGeneratedCouples();
-        initialiseRotationEliminatedCouples();
-
+        if (!metaRotations.isEmpty()) {
+            linkPairsWithIndices();
+            getComparibilityGraph();
+            initialiseSup();
+            initialiseSdown();
+            initialiseRotationGeneratedCouples();
+            initialiseRotationEliminatedCouples();
+        }
         preProcessingOneTime = System.currentTimeMillis() - startTime;
         preProcessingOneTime = preProcessingOneTime / 1000;
     }

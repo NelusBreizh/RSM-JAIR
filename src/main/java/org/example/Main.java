@@ -21,8 +21,8 @@ public class Main {
 //            int[] permutation = PreferanceGeneration.customRPG(10, false);
 //            System.out.println(Arrays.toString(permutation));
 //        }
-        int N = 500;
-        int C = 10;
+        int N = 5;
+        int C = 1;
         int[] maleCap = new int[N];
         Arrays.fill(maleCap, C);
         int[] femaleCap = new int[N];
