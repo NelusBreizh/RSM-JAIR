@@ -13,108 +13,499 @@ import static org.example.Main.generateLists;
 public class Benchmark {
 
     public static void main(String[] args) throws Exception {
-        int N = 5;
-        int C = 1;
-        int[][][] preferences = generateLists(N);
-        int[][] malePref = preferences[0];
-        int[][] femalePref = preferences[1];
-        InstanceData data = new InstanceData(N, C, malePref, femalePref);
-        System.out.println(bench(data));
+//        int N = 5;
+//        int C = 1;
+//        int[][][] preferences = generateLists(N);
+//        int[][] malePref = preferences[0];
+//        int[][] femalePref = preferences[1];
+//        InstanceData data = new InstanceData(N, C, malePref, femalePref, "test");
+//        System.out.println(bench(data, false, ""));
+
+
+        bench_zip("mapel_230_n100.zip");
     }
 
     /**
      * Runs full pipeline on a single instance and returns JSON stats.
      */
-    public static JSONObject bench(InstanceData data)
-            throws Exception {
+    public static JSONObject bench(
+            InstanceData data,
+            boolean writeToFile,
+            String outputFolder
+    ) throws Exception {
 
         int N = data.N;
+
         int[] maleCap = new int[N];
         int[] femaleCap = new int[N];
+
         Arrays.fill(maleCap, data.cap);
         Arrays.fill(femaleCap, data.cap);
 
-        int[][] malePref = data.malePref;
-        int[][] femalePref = data.femalePref;
+        ProcessInstance instance = new ProcessInstance(
+                data.malePref,
+                data.femalePref,
+                maleCap,
+                femaleCap
+        );
 
-        ProcessInstance instance = new ProcessInstance(malePref, femalePref, maleCap, femaleCap);
         instance.constructMetaRotationPoset();
 
+        JSONObject result;
+
         if (instance.metaRotations.isEmpty()) {
-            return new JSONObject()
-                .put("uniqueStableMatching", true);
+
+            result = new JSONObject()
+                    .put("uniqueStableMatching", true);
+
+        } else {
+
+            // ================= BASE INSTANCE =================
+
+            CPInstance cp = new CPInstance(instance);
+            cp.runNaive = true;
+            cp.timeLimit = "300s";
+            cp.solve();
+
+            LocalSearch ls = new LocalSearch(instance);
+            ls.generalProcedure(300000, 50, 10000);
+
+            JSONObject baseInstance = new JSONObject()
+                    .put("rotations", instance.metaRotations.size())
+                    .put("pairs", instance.rotationOX.size())
+                    .put("timeOne", instance.preProcessingOneTime)
+                    .put("constraintProgramming", new JSONObject()
+                            .put("status",
+                                    cp.chocoStatus == 0
+                                            ? "TERMINATED"
+                                            : "STOPPED")
+                            .put("optimalValue", (int) cp.optValue)
+                            .put("timeBest", cp.timeBestSolution)
+                            .put("timeTotal", cp.solveTime))
+                    .put("localSearch", new JSONObject()
+                            .put("bestValue", ls.bestValue)
+                            .put("timeBest",
+                                    (float) ls.timeBestSolution / 1000));
+
+            // ================= PREPROCESSED INSTANCE =================
+
+            CPInstance cp2 = new CPInstance(instance);
+            cp2.runNaive = false;
+            cp2.timeLimit = "300s";
+            cp2.solve();
+
+            if (cp2.heuristicOptimal) {
+
+                result = new JSONObject()
+                        .put("uniqueStableMatching", false)
+                        .put("baseInstance", baseInstance)
+                        .put("heuristicOptimal", true);
+
+            } else {
+
+                ReducedLocalSearch rls =
+                        new ReducedLocalSearch(instance, cp2);
+
+                rls.generalProcedure(300000, 50, 10000);
+
+                JSONObject preProcessedInstance = new JSONObject()
+                        .put("bM0", cp2.M0b)
+                        .put("bMZ", cp2.MZb)
+                        .put("bLowerMedian", cp2.lowerMedianB)
+                        .put("bUpperMedian", cp2.upperMedianB)
+                        .put("relevantPairs",
+                                cp2.reducedRotationOX.size())
+                        .put("searchSpace",
+                                cp2.SuperstableUB.length
+                                        - cp2.SuperstableLB.length)
+                        .put("timeTwo", cp2.preProcessingTwoTime)
+                        .put("constraintProgramming", new JSONObject()
+                                .put("status",
+                                        cp2.chocoStatus == 0
+                                                ? "TERMINATED"
+                                                : "STOPPED")
+                                .put("optimalValue", (int) cp2.optValue)
+                                .put("timeBest", cp2.timeBestSolution)
+                                .put("timeTotal", cp2.solveTime))
+                        .put("localSearch", new JSONObject()
+                                .put("bestValue", rls.bestValue)
+                                .put("timeBest",
+                                        (float) rls.timeBestSolution / 1000));
+
+                result = new JSONObject()
+                        .put("uniqueStableMatching", false)
+                        .put("baseInstance", baseInstance)
+                        .put("heuristicOptimal", false)
+                        .put("preProcessedInstance",
+                                preProcessedInstance);
+            }
         }
 
-        // ================= BASE INSTANCE =================
-        CPInstance cp = new CPInstance(instance);
-        cp.runNaive = true;
-        cp.timeLimit = "60s";
-        cp.solve();
+        // ======================================================
+        // OUTPUT
+        // ======================================================
 
-        LocalSearch ls = new LocalSearch(instance);
-        ls.generalProcedure(60000, 50, 10000);
+        if (writeToFile) {
 
-        JSONObject baseInstance = new JSONObject()
-                .put("rotations", instance.metaRotations.size())
-                .put("pairs", instance.rotationOX.size())
-                .put("timeOne", instance.preProcessingOneTime)
-                .put("constraintProgramming", new JSONObject()
-                        .put("status", cp.chocoStatus == 0 ? "TERMINATED" : "STOPPED")
-                        .put("optimalValue", (int) cp.optValue)
-                        .put("timeBest", cp.timeBestSolution)
-                        .put("timeTotal", cp.solveTime))
-                .put("localSearch", new JSONObject()
-                        .put("bestValue", ls.bestValue)
-                        .put("timeBest", (float) ls.timeBestSolution / 1000));
+            File folder = new File(outputFolder);
 
-        // ================= PREPROCESSED INSTANCE =================
-        CPInstance cp2 = new CPInstance(instance);
-        cp2.runNaive = false;
-        cp2.timeLimit = "60s";
-        cp2.solve();
+            if (!folder.exists())
+                folder.mkdirs();
 
-        if(cp2.heuristicOptimal) {
-            return new JSONObject()
-                    .put("uniqueStableMatching", false)
-                    .put("baseInstance", baseInstance)
-                    .put("heuristicOptimal", true);
+            File outputFile = new File(
+                    folder,
+                    data.name + "_result.txt"
+            );
+
+            try (FileWriter writer = new FileWriter(outputFile)) {
+                writer.write(result.toString(4));
+            }
+
+        } else {
+
+            System.out.println(result.toString(4));
         }
 
-
-        ReducedLocalSearch rls = new ReducedLocalSearch(instance, cp2);
-        rls.generalProcedure(60000, 50, 10000);
-
-        JSONObject preProcessedInstance = new JSONObject()
-                .put("bM0", cp2.M0b)
-                .put("bMZ", cp2.MZb)
-                .put("bLowerMedian", cp2.lowerMedianB)
-                .put("bUpperMedian", cp2.upperMedianB)
-                .put("relevantPairs", cp2.reducedRotationOX.size())
-                .put("searchSpace", cp2.SuperstableUB.length - cp2.SuperstableLB.length)
-                .put("timeTwo", cp2.preProcessingTwoTime)
-                .put("constraintProgramming", new JSONObject()
-                        .put("status", cp2.chocoStatus == 0 ? "TERMINATED" : "STOPPED")
-                        .put("optimalValue", (int) cp2.optValue)
-                        .put("timeBest", cp2.timeBestSolution)
-                        .put("timeTotal", cp2.solveTime))
-                .put("localSearch", new JSONObject()
-                        .put("bestValue", rls.bestValue)
-                        .put("timeBest", (float) rls.timeBestSolution / 1000));
-
-        return new JSONObject()
-                .put("uniqueStableMatching", false)
-                .put("baseInstance", baseInstance)
-                .put("heuristicOptimal", false)
-                .put("preProcessedInstance", preProcessedInstance);
+        return result;
     }
 
-    /**
-     * TODO: implement your own parser later.
-     */
-    public static InstanceData parseInstance(File file) {
-        // Placeholder stub
-        // You will replace this with real parsing logic
-        throw new UnsupportedOperationException("Parser not implemented yet: " + file.getName());
+
+    public static void bench_zip(String zipName) throws Exception {
+
+        File folder = new File(
+                "src/main/java/org/example/benchmarks/"
+        );
+
+        File zipFile = new File(folder, zipName);
+
+        if (!zipFile.exists()) {
+            throw new IllegalArgumentException(
+                    "ZIP file not found: "
+                            + zipFile.getAbsolutePath()
+            );
+        }
+
+        String baseName = zipName.substring(
+                0,
+                zipName.length() - 4
+        );
+
+        File tempInput = new File(
+                folder,
+                baseName + "_tmp"
+        );
+
+        File tempOutput = new File(
+                folder,
+                baseName + "_result_tmp"
+        );
+
+        File resultZip = new File(
+                folder,
+                baseName + "_result.zip"
+        );
+
+        // Clean previous temporary/output files
+        deleteDirectory(tempInput);
+        deleteDirectory(tempOutput);
+
+        if (resultZip.exists())
+            resultZip.delete();
+
+        tempInput.mkdirs();
+        tempOutput.mkdirs();
+
+        // ======================================================
+        // EXTRACT
+        // ======================================================
+
+        System.out.println(
+                "Extracting " + zipName + "..."
+        );
+
+        unzip(zipFile, tempInput);
+
+        // ======================================================
+        // FIND INSTANCES
+        // ======================================================
+
+        java.util.List<File> files =
+                new java.util.ArrayList<>();
+
+        collectTxtFiles(tempInput, files);
+
+        System.out.println(
+                "Found " + files.size() + " instances."
+        );
+
+        // ======================================================
+        // BENCHMARK
+        // ======================================================
+
+        int count = 0;
+
+        for (File inputFile : files) {
+
+            String relativePath = tempInput
+                    .toURI()
+                    .relativize(inputFile.toURI())
+                    .getPath();
+
+            File relativeFile =
+                    new File(relativePath);
+
+            File relativeParent =
+                    relativeFile.getParentFile();
+
+            File resultDir = tempOutput;
+
+            if (relativeParent != null) {
+                resultDir = new File(
+                        tempOutput,
+                        relativeParent.getPath()
+                );
+            }
+
+            if (!resultDir.exists())
+                resultDir.mkdirs();
+
+            InstanceData data =
+                    parseInstance(inputFile, 1);
+
+            System.out.println(
+                    "[" + (++count) + "/"
+                            + files.size() + "] "
+                            + relativePath
+            );
+
+            bench(
+                    data,
+                    true,
+                    resultDir.getPath()
+            );
+        }
+
+        // ======================================================
+        // CREATE RESULT ZIP
+        // ======================================================
+
+        System.out.println(
+                "\nCreating result ZIP..."
+        );
+
+        zipDirectory(
+                tempOutput,
+                resultZip
+        );
+
+        // ======================================================
+        // CLEAN UP
+        // ======================================================
+
+        deleteDirectory(tempInput);
+        deleteDirectory(tempOutput);
+
+        System.out.println(
+                "\nBenchmark complete: "
+                        + count
+                        + " instances."
+        );
+
+        System.out.println(
+                "Result: "
+                        + resultZip.getAbsolutePath()
+        );
+    }
+
+    private static void collectTxtFiles(
+            File folder,
+            java.util.List<File> files) {
+
+        File[] entries = folder.listFiles();
+
+        if (entries == null)
+            return;
+
+        for (File entry : entries) {
+
+            if (entry.isDirectory()) {
+
+                collectTxtFiles(entry, files);
+
+            } else if (
+                    entry.getName().endsWith(".txt")
+                            && !entry.getName().endsWith("_result.txt")
+            ) {
+
+                files.add(entry);
+            }
+        }
+    }
+
+    private static void unzip(
+            File zipFile,
+            File destination) throws IOException {
+
+        try (
+                java.util.zip.ZipInputStream zis =
+                        new java.util.zip.ZipInputStream(
+                                new java.io.FileInputStream(zipFile)
+                        )
+        ) {
+
+            java.util.zip.ZipEntry entry;
+
+            byte[] buffer = new byte[8192];
+
+            while ((entry = zis.getNextEntry()) != null) {
+
+                File outputFile = new File(
+                        destination,
+                        entry.getName()
+                );
+
+                // Protect against Zip Slip
+                String destinationPath =
+                        destination.getCanonicalPath()
+                                + File.separator;
+
+                String outputPath =
+                        outputFile.getCanonicalPath();
+
+                if (!outputPath.startsWith(destinationPath)) {
+                    throw new IOException(
+                            "Invalid ZIP entry: "
+                                    + entry.getName()
+                    );
+                }
+
+                if (entry.isDirectory()) {
+
+                    outputFile.mkdirs();
+
+                } else {
+
+                    outputFile.getParentFile().mkdirs();
+
+                    try (
+                            java.io.FileOutputStream fos =
+                                    new java.io.FileOutputStream(
+                                            outputFile
+                                    )
+                    ) {
+
+                        int len;
+
+                        while ((len = zis.read(buffer)) > 0) {
+                            fos.write(buffer, 0, len);
+                        }
+                    }
+                }
+
+                zis.closeEntry();
+            }
+        }
+    }
+
+    private static void zipDirectory(
+            File directory,
+            File zipFile) throws IOException {
+
+        try (
+                java.util.zip.ZipOutputStream zos =
+                        new java.util.zip.ZipOutputStream(
+                                new java.io.FileOutputStream(zipFile)
+                        )
+        ) {
+
+            java.nio.file.Path base =
+                    directory.toPath();
+
+            java.nio.file.Files.walk(base)
+                    .filter(path ->
+                            !java.nio.file.Files.isDirectory(path))
+                    .forEach(path -> {
+
+                        try {
+
+                            String relative =
+                                    base.relativize(path)
+                                            .toString()
+                                            .replace(
+                                                    File.separator,
+                                                    "/"
+                                            );
+
+                            java.util.zip.ZipEntry entry =
+                                    new java.util.zip.ZipEntry(
+                                            relative
+                                    );
+
+                            zos.putNextEntry(entry);
+
+                            java.nio.file.Files.copy(
+                                    path,
+                                    zos
+                            );
+
+                            zos.closeEntry();
+
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        }
+    }
+
+    private static void deleteDirectory(File directory)
+            throws IOException {
+
+        if (!directory.exists())
+            return;
+
+        java.nio.file.Files.walk(directory.toPath())
+                .sorted(java.util.Comparator.reverseOrder())
+                .map(java.nio.file.Path::toFile)
+                .forEach(File::delete);
+    }
+
+    public static InstanceData parseInstance(File file, int cap) throws IOException {
+        try (var br = new java.io.BufferedReader(new java.io.FileReader(file))) {
+
+            var lines = br.lines()
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+
+            int N = Integer.parseInt(lines.get(0));
+
+            int[][] malePref = new int[N][N];
+            int[][] femalePref = new int[N][N];
+
+            for (int i = 0; i < N; i++) {
+                var values = lines.get(i + 1).split("\\s+");
+                for (int j = 0; j < N; j++)
+                    malePref[i][j] = Integer.parseInt(values[j]);
+            }
+
+            for (int i = 0; i < N; i++) {
+                var values = lines.get(i + N + 1).split("\\s+");
+                for (int j = 0; j < N; j++)
+                    femalePref[i][j] = Integer.parseInt(values[j]);
+            }
+
+            String name = file.getName();
+            if (name.endsWith(".txt"))
+                name = name.substring(0, name.length() - 4);
+
+            return new InstanceData(
+                    N,
+                    cap,
+                    malePref,
+                    femalePref,
+                    name
+            );
+        }
     }
 
     /**
@@ -125,12 +516,20 @@ public class Benchmark {
         int cap;
         int[][] malePref;
         int[][] femalePref;
+        String name;
 
-        public InstanceData(int N, int cap, int[][] malePref, int[][] femalePref) {
+        public InstanceData(
+                int N,
+                int cap,
+                int[][] malePref,
+                int[][] femalePref,
+                String name) {
+
             this.N = N;
             this.cap = cap;
             this.malePref = malePref;
             this.femalePref = femalePref;
+            this.name = name;
         }
     }
 }
