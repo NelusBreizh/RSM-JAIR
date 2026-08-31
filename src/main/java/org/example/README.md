@@ -29,7 +29,7 @@ The manyToMany package contains all the models and algorithms related to the Rob
 
 ## propagators package
 
-The propagator package contains the propagators of constraints specifically developped for the RSM problem and that are not initially implemented in choco-solver.
+The propagator package contains the propagators specifically developed for the RSM problem.
 
 
 
