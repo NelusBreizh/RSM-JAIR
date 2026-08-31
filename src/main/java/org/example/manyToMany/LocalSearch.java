@@ -18,6 +18,12 @@ public class LocalSearch {
         this.instance = instance;
     }
 
+
+    /*
+     * This class implements the Local Search algorithm described in the following thesis to solve the Robust Stable Marriage problem:
+     * - B. Genc. 2019. An approach to robustness in stable marriage and stable roommates problems. PhD thesis. University College Cork
+     */
+
     public void generalProcedure(long timeLimit, int descLimit, int cntLimit) {
         long startTime = System.currentTimeMillis();
         currentMatching = initialMatching();

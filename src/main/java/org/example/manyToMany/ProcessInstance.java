@@ -34,6 +34,12 @@ public class ProcessInstance {
     public int[][] rotationEliminatedCouples;
     public float preProcessingOneTime;
 
+    /*
+     * This class implements the various algorithms from the following papers to compute the rotation poset of a many-to-many stable marriage instance:
+     * - M. Baıou and M. Balinski. 2000. Many-to-many matching: stable polyandrous polygamy (or polygamous polyandry). Discrete Applied Mathematics
+     * - V. Bansal, A. Agrawal, and V. S. Malhotra. 2007. Polynomial time algorithm for an optimal stable assignment with multiple partners. Theoretical Computer Science
+     * - P. Eirinakis, D. Magos, I. Mourtos, and P. Miliotis. 2012. Finding all stable pairs and solutions to the many-to-many stable matching problem. INFORMS Journal on Computing
+     */
 
 
     public ProcessInstance(int[][] malesPref, int[][] femalesPref, int[] malesCap, int[] femalesCap) {

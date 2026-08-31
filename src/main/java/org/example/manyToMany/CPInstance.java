@@ -43,6 +43,11 @@ public class CPInstance {
     public String status;
     public boolean heuristicOptimal;
 
+    /*
+     * This class implements the preprocessing algorithms making the contributions of the submitted paper.
+     * The implemented preprocessing algorithms are a simpler version than those presented in the paper. In particular, they do not implement the marking trick that reduces computation time.
+     */
+
     public CPInstance(ProcessInstance instance) {
         this.instance = instance;
         this.numberCouples = instance.rotationOX.keySet().size();

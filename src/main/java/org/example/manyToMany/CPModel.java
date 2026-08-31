@@ -16,6 +16,11 @@ import java.util.*;
 
 public class CPModel {
 
+
+    /*
+     * This class implements the proposed constraint programming adapted to many-to-many stable marriage instances.
+     */
+
     public static float[] run_naive_model(int number_couples, int number_rotation, DirectedGraph poSet, Map<Pair<Integer, Integer>, Pair<Integer, Integer>> rotationOX, int[][] rotationGeneratedCouples, int[][] rotationEliminatedCouples, int[][] S_up, int[][] S_down, int[] M_LB, int[] M_UB, int b_LB, int b_UB, int b_threshold, String timeLimit) {
         // DATA
 

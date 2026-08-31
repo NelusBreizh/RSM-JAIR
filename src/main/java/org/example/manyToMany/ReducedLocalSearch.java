@@ -17,6 +17,10 @@ public class ReducedLocalSearch {
     public int[] bounded_space;
     public boolean valid_bounded_space;
 
+    /*
+     * This class implements the Local Search algorithm adapted to the preprocessing algorithms.
+     */
+
     public ReducedLocalSearch(ProcessInstance instance, CPInstance reduced_instance) {
         this.instance = instance;
         this.reduced_instance = reduced_instance;
